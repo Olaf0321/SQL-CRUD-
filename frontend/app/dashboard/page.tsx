@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../componenets
 import { Input } from '../componenets/ui/Input';
 import { SERVER_URL } from '../config';
 
+type RecordType = { [key: string]: any; id: number };
+
 export default function DashboardPage() {
   const [tables, setTables] = useState<string[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -14,6 +16,8 @@ export default function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<{ [key: string]: any }>({ name: '' });
   const [tableColumns, setTableColumns] = useState<string[]>([]);
+  const [editMode, setEditMode] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
 
   const fetchTables = async () => {
     try {
@@ -84,6 +88,64 @@ export default function DashboardPage() {
     }
   };
 
+  const handleEditClick = async (record: any) => {
+    if (!selectedTable) return;
+    await fetchTableColumns(selectedTable);
+    setEditMode(true);
+    setEditId(record.id);
+    const { id, ...editableData } = record;
+
+    // Fill missing keys with empty string
+    const completeData = tableColumns.reduce((acc, col) => {
+      acc[col] = editableData[col] || ''; // if undefined, set to empty string
+      return acc;
+    }, {} as any);
+    console.log('completeData', completeData);
+    setFormData(completeData);
+    setIsModalOpen(true);
+  };
+
+  const handleUpdateSubmit = async () => {
+    if (!selectedTable || editId === null) return;
+
+    try {
+      const res = await fetch(`${SERVER_URL}items/${selectedTable}/${editId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) throw new Error('Update failed');
+
+      setIsModalOpen(false);
+      setEditMode(false);
+      setEditId(null);
+      setFormData({});
+      fetchRecords(selectedTable);
+    } catch (err) {
+      console.error('更新エラー:', err);
+    }
+  };
+
+  const handleDeleteClick = async (id: number) => {
+    if (!selectedTable) return;
+
+    const confirmDelete = window.confirm('本当にこのレコードを削除しますか？');
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`${SERVER_URL}items/${selectedTable}/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) throw new Error('Delete failed');
+
+      fetchRecords(selectedTable);
+    } catch (err) {
+      console.error('削除エラー:', err);
+    }
+  };
+
   useEffect(() => {
     fetchTables();
   }, []);
@@ -139,13 +201,17 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {records.map((record, index) => (
+              {records.map((record: RecordType, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   {Object.values(record).map((value, idx) => (
                     <td key={idx} className="border border-gray-300 px-4 py-2">
                       {String(value)}
                     </td>
                   ))}
+                  <td className="border border-gray-300 px-4 py-2 space-x-2">
+                    <Button onClick={() => handleEditClick(record)}>更新</Button>
+                    <Button variant="destructive" onClick={() => handleDeleteClick(record.id)}>削除</Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -156,8 +222,9 @@ export default function DashboardPage() {
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Record</DialogTitle>
+              <DialogTitle>{editMode ? 'レコードを更新' : 'レコードを追加'}</DialogTitle>
             </DialogHeader>
+
             {tableColumns.map((col) => (
               <Input
                 key={col}
@@ -167,7 +234,20 @@ export default function DashboardPage() {
                 onChange={(e: any) => setFormData({ ...formData, [col]: e.target.value })}
               />
             ))}
-            <Button onClick={handleFormSubmit}>Submit</Button>
+
+            <div className="mt-4 flex justify-end space-x-2">
+              <Button onClick={() => {
+                setIsModalOpen(false);
+                setEditMode(false);
+                setFormData({});
+                setEditId(null);
+              }}>
+                キャンセル
+              </Button>
+              <Button onClick={editMode ? handleUpdateSubmit : handleFormSubmit}>
+                {editMode ? '保存' : '追加'}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

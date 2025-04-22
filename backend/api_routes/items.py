@@ -15,6 +15,6 @@ def create_table_record(table_name: str, record: dict):
 def update_table_record(table_name: str, record_id: int, record: dict):
     return items_controller.update_table_record(table_name, record_id, record)
 
-@router.put("/{table_name}/{record_id}")
+@router.delete("/{table_name}/{record_id}")
 def delete_table_record(table_name: str, record_id: int):
     return items_controller.delete_table_record(table_name, record_id)
