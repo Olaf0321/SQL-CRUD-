@@ -1,19 +1,26 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { useState, useEffect } from 'react';
+import { Button } from '../componenets/ui/Button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../componenets/ui/Dialog';
+import { Input } from '../componenets/ui/Input';
+import { SERVER_URL } from '../config';
 
 export default function DashboardPage() {
   const [tables, setTables] = useState<string[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState<{ [key: string]: any }>({ name: '' });
 
   useEffect(() => {
     const fetchTables = async () => {
       try {
-        const res = await fetch('http://localhost:8010/tables/');
+        const res = await fetch(`${SERVER_URL}tables/`);
         const data = await res.json();
         const tableList = data.tables;
-        setTables(tableList.filter((ele: string) => ele !== 'sqlite_sequence'));
+        setTables(tableList.filter((t: string) => t !== 'sqlite_sequence'));
         if (tableList.length > 0) {
           setSelectedTable(tableList[0]);
           fetchRecords(tableList[0]);
@@ -24,12 +31,13 @@ export default function DashboardPage() {
         setLoading(false);
       }
     };
+
     fetchTables();
   }, []);
 
   const fetchRecords = async (tableName: string) => {
     try {
-      const res = await fetch(`http://localhost:8010/items/${tableName}`);
+      const res = await fetch(`${SERVER_URL}items/${tableName}`);
       const data = await res.json();
       setRecords(data.records || []);
     } catch (err) {
@@ -42,9 +50,29 @@ export default function DashboardPage() {
     fetchRecords(tableName);
   };
 
+  const handleFormSubmit = async () => {
+    if (!selectedTable) return;
+
+    try {
+      const res = await fetch(`${SERVER_URL}items/${selectedTable}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) throw new Error('Items failed');
+
+      setIsModalOpen(false);
+      setFormData({ name: '' });
+      fetchRecords(selectedTable); // Reload data
+    } catch (err) {
+      console.error('Items error:', err);
+    }
+  };
+
   return (
     <main className="flex h-screen">
-      {/* 左サイドバー：テーブル一覧 */}
+      {/* Sidebar */}
       <div className="w-1/4 bg-gray-100 p-4 overflow-y-auto border-r">
         <h2 className="text-xl font-semibold mb-4">テーブル一覧</h2>
         {loading ? (
@@ -57,10 +85,11 @@ export default function DashboardPage() {
               <li
                 key={table}
                 onClick={() => handleTableClick(table)}
-                className={`cursor-pointer px-3 py-2 rounded-md transition-all ${table === selectedTable
-                  ? 'bg-blue-500 text-white font-bold'
-                  : 'hover:bg-blue-100 text-gray-800'
-                  }`}
+                className={`cursor-pointer px-3 py-2 rounded-md transition-all ${
+                  table === selectedTable
+                    ? 'bg-blue-500 text-white font-bold'
+                    : 'hover:bg-blue-100 text-gray-800'
+                }`}
               >
                 {table}
               </li>
@@ -69,23 +98,27 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* 右側：レコード表示 */}
+      {/* Main Area */}
       <div className="w-3/4 p-6 overflow-y-auto">
-        <h2 className="text-xl font-semibold mb-4">
-          {selectedTable ? `テーブル「${selectedTable}」のレコード` : 'レコード表示'}
-        </h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">
+            {selectedTable ? `テーブル「${selectedTable}」のレコード` : 'レコード表示'}
+          </h2>
+          <Button onClick={() => setIsModalOpen(true)}>Add Record</Button>
+        </div>
 
+        {/* Records Table */}
         {records.length === 0 ? (
           <p className="text-gray-500">このテーブルにはレコードが存在しません。</p>
         ) : (
-          < table className="min-w-full table-auto border border-gray-300 mt-4">
+          <table className="min-w-full table-auto border border-gray-300">
             <thead>
               <tr className="bg-gray-100">
-                  {Object.keys(records[0]).map((key) => (
-                    <th key={key} className="border border-gray-300 px-4 py-2 text-left">
-                      {key}
-                    </th>
-                  ))}
+                {Object.keys(records[0]).map((key) => (
+                  <th key={key} className="border border-gray-300 px-4 py-2 text-left">
+                    {key}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -101,7 +134,23 @@ export default function DashboardPage() {
             </tbody>
           </table>
         )}
+
+        {/* Modal Dialog */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Record</DialogTitle>
+            </DialogHeader>
+            <Input
+              id="name"
+              label="Name"
+              value={formData.name}
+              onChange={(e: any) => setFormData({ ...formData, name: e.target.value })}
+            />
+            <Button onClick={handleFormSubmit}>Submit</Button>
+          </DialogContent>
+        </Dialog>
       </div>
-    </main >
+    </main>
   );
 }
