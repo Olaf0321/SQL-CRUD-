@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '../componenets/ui/Button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../componenets/ui/Dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../componenets/ui/Dialog'
 import { Input } from '../componenets/ui/Input';
 import { SERVER_URL } from '../config';
 
@@ -13,27 +13,40 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<{ [key: string]: any }>({ name: '' });
+  const [tableColumns, setTableColumns] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchTables = async () => {
-      try {
-        const res = await fetch(`${SERVER_URL}tables/`);
-        const data = await res.json();
-        const tableList = data.tables;
-        setTables(tableList.filter((t: string) => t !== 'sqlite_sequence'));
-        if (tableList.length > 0) {
-          setSelectedTable(tableList[0]);
-          fetchRecords(tableList[0]);
-        }
-      } catch (err) {
-        console.error('テーブル取得エラー:', err);
-      } finally {
-        setLoading(false);
+  const fetchTables = async () => {
+    try {
+      const res = await fetch(`${SERVER_URL}tables/`);
+      const data = await res.json();
+      const tableList = data.tables;
+      setTables(tableList.filter((t: string) => t !== 'sqlite_sequence'));
+      if (tableList.length > 0) {
+        setSelectedTable(tableList[0]);
+        fetchRecords(tableList[0]);
+        fetchTableColumns(tableList[0]);
       }
-    };
+    } catch (err) {
+      console.error('テーブル取得エラー:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchTables();
-  }, []);
+  const fetchTableColumns = async (tableName: string) => {
+    try {
+      const res = await fetch(`${SERVER_URL}columns/${tableName}`);
+      const data = await res.json();
+      setTableColumns(data.columns || []);
+
+      // Initialize formData with empty strings
+      const initialForm: { [key: string]: any } = {};
+      data.columns.forEach((col: string) => initialForm[col] = '');
+      setFormData(initialForm);
+    } catch (err) {
+      console.error('Failed to fetch columns:', err);
+    }
+  };
 
   const fetchRecords = async (tableName: string) => {
     try {
@@ -48,6 +61,7 @@ export default function DashboardPage() {
   const handleTableClick = (tableName: string) => {
     setSelectedTable(tableName);
     fetchRecords(tableName);
+    fetchTableColumns(tableName); // Get column names
   };
 
   const handleFormSubmit = async () => {
@@ -70,6 +84,10 @@ export default function DashboardPage() {
     }
   };
 
+  useEffect(() => {
+    fetchTables();
+  }, []);
+
   return (
     <main className="flex h-screen">
       {/* Sidebar */}
@@ -85,11 +103,10 @@ export default function DashboardPage() {
               <li
                 key={table}
                 onClick={() => handleTableClick(table)}
-                className={`cursor-pointer px-3 py-2 rounded-md transition-all ${
-                  table === selectedTable
-                    ? 'bg-blue-500 text-white font-bold'
-                    : 'hover:bg-blue-100 text-gray-800'
-                }`}
+                className={`cursor-pointer px-3 py-2 rounded-md transition-all ${table === selectedTable
+                  ? 'bg-blue-500 text-white font-bold'
+                  : 'hover:bg-blue-100 text-gray-800'
+                  }`}
               >
                 {table}
               </li>
@@ -141,12 +158,15 @@ export default function DashboardPage() {
             <DialogHeader>
               <DialogTitle>Add New Record</DialogTitle>
             </DialogHeader>
-            <Input
-              id="name"
-              label="Name"
-              value={formData.name}
-              onChange={(e: any) => setFormData({ ...formData, name: e.target.value })}
-            />
+            {tableColumns.map((col) => (
+              <Input
+                key={col}
+                id={col}
+                label={col}
+                value={formData[col] || ''}
+                onChange={(e: any) => setFormData({ ...formData, [col]: e.target.value })}
+              />
+            ))}
             <Button onClick={handleFormSubmit}>Submit</Button>
           </DialogContent>
         </Dialog>

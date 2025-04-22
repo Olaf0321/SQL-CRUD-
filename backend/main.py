@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api_routes import items, tables
+from api_routes import items, tables, columns
 
 app = FastAPI()
 
@@ -16,3 +16,4 @@ app.add_middleware(
 # Include item routes
 app.include_router(items.router, prefix="/items", tags=["Items"])
 app.include_router(tables.router, prefix="/tables", tags=["tables"])
+app.include_router(columns.router, prefix="/columns", tags=["columns"])

@@ -3,10 +3,6 @@ from controllers import items_controller
 
 router = APIRouter()
 
-# @router.get("/")
-# def get_items():
-#     return items_controller.read_items()
-
 @router.get("/{tableName}")
 def get_table_records(tableName):
     return items_controller.read_table_records(tableName)
