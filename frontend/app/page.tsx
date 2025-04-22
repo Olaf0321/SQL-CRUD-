@@ -2,17 +2,37 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { LOGIN_SERVER_URL  } from './config';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    if (email === 'test@example.com' && password === 'password123') {
-      router.push('/dashboard');
+  const handleLogin = async () => {
+    if (email == '' || password == '') {
+      alert('正確に入力してください。');
+      return ;
+    }
+    const response = await fetch(`${LOGIN_SERVER_URL}login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // ✅ THIS is necessary to send cookies
+      body: JSON.stringify({
+        email: email,
+        password: password
+      })
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+      setEmail('');
+      setPassword('');
+      window.location.href = '/dashboard'; // Redirect to dashboard or another page
     } else {
-      alert('Invalid credentials');
+      alert(data.message); // Login failure message
     }
   };
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../componenets/ui/Button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../componenets/ui/Dialog'
 import { Input } from '../componenets/ui/Input';
-import { SERVER_URL } from '../config';
+import { LOGIN_SERVER_URL, SERVER_URL } from '../config';
 
 type RecordType = { [key: string]: any; id: number };
 
@@ -147,6 +147,30 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch(`${LOGIN_SERVER_URL}check-session`, {
+          method: 'GET',
+          credentials: 'include'
+        });
+        if (!res.ok) {
+          // Session expired
+          window.location.href = '/'; // Redirect to login page
+        }
+      } catch (err) {
+        console.error('Session check failed:', err);
+        window.location.href = '/';
+      }
+    };
+
+    // Check every 30 seconds
+    const interval = setInterval(checkSession, 30000);
+    checkSession(); // Also run once right away
+
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, []);
+
+  useEffect(() => {
     fetchTables();
   }, []);
 
@@ -183,7 +207,7 @@ export default function DashboardPage() {
           <h2 className="text-xl font-semibold">
             {selectedTable ? `テーブル「${selectedTable}」のレコード` : 'レコード表示'}
           </h2>
-          <Button onClick={() => setIsModalOpen(true)}>Add Record</Button>
+          <Button onClick={() => setIsModalOpen(true)}>追加</Button>
         </div>
 
         {/* Records Table */}
