@@ -5,8 +5,6 @@ import { SERVER_URL } from '../config'
 export default function Dashboard() {
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
-
-  console.log('server_url', SERVER_URL);
   
   useEffect(() => {
     fetch(`${SERVER_URL}items/`)
@@ -15,7 +13,6 @@ export default function Dashboard() {
         return res.json();
       })
       .then((data) => {
-        console.log('data', items);
         setItems(data);
       })
       .catch((err) => setError(err.message));
