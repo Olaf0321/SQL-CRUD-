@@ -7,5 +7,5 @@ def get_table_columns(table_name: str):
     cursor.execute(f"PRAGMA table_info({table_name})")
     columns_info = cursor.fetchall()
     conn.close()
-    columns = [col[1] for col in columns_info if col[1] != "id"]  # Exclude ID
+    columns = [col[1] for col in columns_info if col[1] != "ID"]  # Exclude ID
     return {"columns": columns}

@@ -18,6 +18,9 @@ export default function DashboardPage() {
   const [tableColumns, setTableColumns] = useState<string[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
+  const [totalFilter, setTotalFilter] = useState('');
+  const [rowNumber, setRowNumber] = useState(0);
+  const [disPlayRecords, setDisPlayRecords] = useState<any[]>([]);
 
   const fetchTables = async () => {
     try {
@@ -69,6 +72,16 @@ export default function DashboardPage() {
   };
 
   const handleFormSubmit = async () => {
+    console.log('formdata', formData);
+    let flag: Boolean = false;
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value === '') flag = true;
+    });
+
+    if (flag == true) {
+      alert('正確に入力してください。');
+      return;
+    }
     if (!selectedTable) return;
 
     try {
@@ -81,7 +94,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error('Items failed');
 
       setIsModalOpen(false);
-      setFormData({ name: '' });
+      setFormData({});
       fetchRecords(selectedTable); // Reload data
     } catch (err) {
       console.error('Items error:', err);
@@ -92,8 +105,8 @@ export default function DashboardPage() {
     if (!selectedTable) return;
     await fetchTableColumns(selectedTable);
     setEditMode(true);
-    setEditId(record.id);
-    const { id, ...editableData } = record;
+    setEditId(record.ID);
+    const { ID, ...editableData } = record;
 
     // Fill missing keys with empty string
     const completeData = tableColumns.reduce((acc, col) => {
@@ -106,6 +119,16 @@ export default function DashboardPage() {
   };
 
   const handleUpdateSubmit = async () => {
+    let flag: Boolean = false;
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value === '') flag = true;
+    });
+
+    if (flag == true) {
+      alert('正確に入力してください。');
+      return;
+    }
+
     if (!selectedTable || editId === null) return;
 
     try {
@@ -127,14 +150,14 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDeleteClick = async (id: number) => {
+  const handleDeleteClick = async (ID: number) => {
     if (!selectedTable) return;
 
     const confirmDelete = window.confirm('本当にこのレコードを削除しますか？');
     if (!confirmDelete) return;
 
     try {
-      const res = await fetch(`${SERVER_URL}items/${selectedTable}/${id}`, {
+      const res = await fetch(`${SERVER_URL}items/${selectedTable}/${ID}`, {
         method: 'DELETE',
       });
 
@@ -145,6 +168,10 @@ export default function DashboardPage() {
       console.error('削除エラー:', err);
     }
   };
+
+  const handleTotalFilter = (e: any) => {
+    setTotalFilter(e.target.value);
+  }
 
   useEffect(() => {
     const checkSession = async () => {
@@ -173,6 +200,27 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchTables();
   }, []);
+
+  const contains = (text: string, search: string): boolean => {
+    return text.includes(search);
+  };
+
+  const getDisplayRecords = () => {
+    let newRecords: Record<string, any>[] = [];
+    records.map(record => {
+      let str = '';
+      Object.entries(record).map(([key, value]) => {
+        str += value;
+      });
+      if (contains(str, totalFilter)) newRecords.push(record);
+    })
+    setDisPlayRecords(newRecords);
+  }
+
+  useEffect(() => {
+    setRowNumber(records.length);
+    getDisplayRecords();
+  }, [records, totalFilter])
 
   return (
     <main className="flex h-screen">
@@ -207,34 +255,49 @@ export default function DashboardPage() {
           <h2 className="text-xl font-semibold">
             {selectedTable ? `テーブル「${selectedTable}」のレコード` : 'レコード表示'}
           </h2>
-          <Button onClick={() => setIsModalOpen(true)}>追加</Button>
+          <div className='flex items-center'>
+            <Input
+              id=''
+              label=''
+              value={totalFilter}
+              placeholderValue={`${rowNumber} 行をフィルター`}
+              onChange={(e: any) => handleTotalFilter(e)}
+              className='mt-3 mr-3'
+            />
+            <Button onClick={() => {
+              setIsModalOpen(true);
+              setFormData({});
+            }}
+            >追加</Button>
+          </div>
         </div>
 
         {/* Records Table */}
-        {records.length === 0 ? (
+        {disPlayRecords.length === 0 ? (
           <p className="text-gray-500">このテーブルにはレコードが存在しません。</p>
         ) : (
           <table className="min-w-full table-auto border border-gray-300">
             <thead>
               <tr className="bg-gray-100">
-                {Object.keys(records[0]).map((key) => (
+                {Object.keys(disPlayRecords[0]).map((key) => (
                   <th key={key} className="border border-gray-300 px-4 py-2 text-left">
                     {key}
                   </th>
                 ))}
+                <th className="border border-gray-300 px-4 py-2 text-left"></th>
               </tr>
             </thead>
             <tbody>
-              {records.map((record: RecordType, index) => (
+              {disPlayRecords.map((record: RecordType, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   {Object.values(record).map((value, idx) => (
                     <td key={idx} className="border border-gray-300 px-4 py-2">
                       {String(value)}
                     </td>
                   ))}
-                  <td className="border border-gray-300 px-4 py-2 space-x-2">
+                  <td className="  -pointer border border-gray-300 px-4 py-2 space-x-2">
                     <Button onClick={() => handleEditClick(record)}>更新</Button>
-                    <Button variant="destructive" onClick={() => handleDeleteClick(record.id)}>削除</Button>
+                    <Button variant="destructive" onClick={() => handleDeleteClick(record.ID)}>削除</Button>
                   </td>
                 </tr>
               ))}
@@ -256,6 +319,7 @@ export default function DashboardPage() {
                 label={col}
                 value={formData[col] || ''}
                 onChange={(e: any) => setFormData({ ...formData, [col]: e.target.value })}
+                className=''
               />
             ))}
 

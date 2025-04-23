@@ -13,29 +13,30 @@ def init_db():
 
     # Create table if it doesn't exist
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS 商品 (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        CREATE TABLE IF NOT EXISTS 従業員 (
+            ID INTEGER PRIMARY KEY AUTOINCREMENT,
             名前 TEXT NOT NULL,
+            利点 TEXT NOT NULL
+        )
+    ''')
+
+    # Optional: Insert sample Japanese data
+    cursor.execute("INSERT INTO 従業員 (名前, 利点) VALUES (?, ?)", ("藤本", "システム開発"))
+    cursor.execute("INSERT INTO 従業員 (名前, 利点) VALUES (?, ?)", ("中村", "ホームページ制作"))
+
+    # Create table if it doesn't exist
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS 商品 (
+            ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            名前 TEXT NOT NULL,
+            価格 INTEGER NOT NULL,
             説明 TEXT NOT NULL
         )
     ''')
 
     # Optional: Insert sample Japanese data
-    cursor.execute("INSERT INTO 商品 (名前, 説明) VALUES (?, ?)", ("サンプル商品1", "説明1"))
-    cursor.execute("INSERT INTO 商品 (名前, 説明) VALUES (?, ?)", ("サンプル商品2", "説明2"))
-
-    # Create table if it doesn't exist
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS スタッフ (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            名前 TEXT NOT NULL,
-            説明 TEXT NOT NULL,
-            その他 TEXT NOT NULL
-        )
-    ''')
-
-    # Optional: Insert sample Japanese data
-    cursor.execute("INSERT INTO スタッフ (名前, 説明, その他) VALUES (?, ?, ?)", ("サンプル商品1", "説明1", "サンプル"))
+    cursor.execute("INSERT INTO 商品 (名前, 価格, 説明) VALUES (?, ?, ?)", ("マウス", 15, "最新"))
+    cursor.execute("INSERT INTO 商品 (名前, 価格, 説明) VALUES (?, ?, ?)", ("レシバ", 15, "最新"))
 
     conn.commit()
     conn.close()
