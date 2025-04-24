@@ -21,6 +21,8 @@ export default function DashboardPage() {
   const [totalFilter, setTotalFilter] = useState('');
   const [rowNumber, setRowNumber] = useState(0);
   const [disPlayRecords, setDisPlayRecords] = useState<any[]>([]);
+  const [sortedColumnName, setSortedColumnName] = useState('');
+  const [sortedColumnState, setSortedColumnState] = useState(0);
 
   const fetchTables = async () => {
     try {
@@ -222,6 +224,32 @@ export default function DashboardPage() {
     getDisplayRecords();
   }, [records, totalFilter])
 
+  const sortJsonByField = (jsonArray: any[], fieldName: string, order: string) => {
+    console.log('order', order);
+    return jsonArray.sort((a, b) => {
+      if (order === 'asc') {
+        return a[fieldName] > b[fieldName] ? 1 : (a[fieldName] < b[fieldName] ? -1 : 0);
+      } else {
+        return a[fieldName] < b[fieldName] ? 1 : (a[fieldName] > b[fieldName] ? -1 : 0);
+      }
+    });
+  }
+
+  useEffect(() => {
+    console.log('sortedColumnState', sortedColumnState);
+    console.log('sortedColumnName', sortedColumnName);
+    let sortedArr :any[] = [];
+    if (sortedColumnState == 0) {
+      sortedArr = sortJsonByField(disPlayRecords, 'ID', 'asc');
+    } else if (sortedColumnState == 1) {
+      sortedArr = sortJsonByField(disPlayRecords, sortedColumnName, 'asc');
+    } else {  
+      sortedArr = sortJsonByField(disPlayRecords, sortedColumnName, 'desc');
+    }
+    console.log('sortedArr', sortedArr);
+    setDisPlayRecords([...sortedArr]);
+  }, [sortedColumnState])
+
   return (
     <main className="flex h-screen">
       {/* Sidebar */}
@@ -280,8 +308,18 @@ export default function DashboardPage() {
             <thead>
               <tr className="bg-gray-100">
                 {Object.keys(disPlayRecords[0]).map((key) => (
-                  <th key={key} className="border border-gray-300 px-4 py-2 text-left">
-                    {key}
+                  <th key={key} className="border border-gray-300 px-4 py-2 max-w-full">
+                    <div className='flex justify-between'>
+                      <div>{key}</div>
+                      <div>
+                        <button onClick={() => {
+                          setSortedColumnName(String(key));
+                          setSortedColumnState((sortedColumnState + 1) % 3);
+                        }}>
+                          {sortedColumnName == key ? sortedColumnState == 1 ? <div className='w-3'>▲</div> : sortedColumnState == 2 ? <div className='w-3'>▼</div> : <div className='w-3'>◼️</div> : <div className='w-3'>◼️</div>}
+                        </button>
+                      </div>
+                    </div>
                   </th>
                 ))}
                 <th className="border border-gray-300 px-4 py-2 text-left"></th>
@@ -320,6 +358,7 @@ export default function DashboardPage() {
                 value={formData[col] || ''}
                 onChange={(e: any) => setFormData({ ...formData, [col]: e.target.value })}
                 className=''
+                placeholderValue=''
               />
             ))}
 
