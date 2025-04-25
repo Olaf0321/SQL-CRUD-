@@ -5,6 +5,9 @@ import { Button } from '../componenets/ui/Button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../componenets/ui/Dialog'
 import { Input } from '../componenets/ui/Input';
 import { LOGIN_SERVER_URL, SERVER_URL } from '../config';
+import Toggle from '../componenets/ui/SwitchToggle';
+import SwitchToggle from '../componenets/ui/SwitchToggle';
+import Notification from '../componenets/Notification';
 
 type RecordType = { [key: string]: any; id: number };
 
@@ -14,7 +17,8 @@ export default function DashboardPage() {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState<{ [key: string]: any }>({ name: '' });
+  const [formData, setFormData] = useState<{ [key: string]: any }>({});
+  const [columnFilter, setColumnFilter] = useState<{ [key: string]: any }>({});
   const [tableColumns, setTableColumns] = useState<string[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -23,6 +27,16 @@ export default function DashboardPage() {
   const [disPlayRecords, setDisPlayRecords] = useState<any[]>([]);
   const [sortedColumnName, setSortedColumnName] = useState('');
   const [sortedColumnState, setSortedColumnState] = useState(0);
+  const [tableColumnsWithoutID, setTableColumnsWithoutID] = useState<string[]>([]);
+  const [isOn, setIsOn] = useState(false);
+  const [isSelected, setIsSelected] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
+
+  const handleToggle = () => {
+    setIsOn(prev => !prev);
+  }
+
+  const triggerNotification = () => setShowNotif(true);
 
   const fetchTables = async () => {
     try {
@@ -47,11 +61,14 @@ export default function DashboardPage() {
       const res = await fetch(`${SERVER_URL}columns/${tableName}`);
       const data = await res.json();
       setTableColumns(data.columns || []);
+      const newCol = data.columns.filter((ele: string) => ele != 'ID');
+      setTableColumnsWithoutID([...newCol]);
 
       // Initialize formData with empty strings
       const initialForm: { [key: string]: any } = {};
       data.columns.forEach((col: string) => initialForm[col] = '');
       setFormData(initialForm);
+      setColumnFilter(initialForm);
     } catch (err) {
       console.error('Failed to fetch columns:', err);
     }
@@ -111,7 +128,7 @@ export default function DashboardPage() {
     const { ID, ...editableData } = record;
 
     // Fill missing keys with empty string
-    const completeData = tableColumns.reduce((acc, col) => {
+    const completeData = tableColumnsWithoutID.reduce((acc, col) => {
       acc[col] = editableData[col] || ''; // if undefined, set to empty string
       return acc;
     }, {} as any);
@@ -152,6 +169,28 @@ export default function DashboardPage() {
     }
   };
 
+  const getDisplayRecords = () => {
+    let newRecords: Record<string, any>[] = [];
+    records.map(record => {
+      let str = '';
+      Object.entries(record).map(([key, value]) => {
+        str += value;
+      });
+      if (contains(str, totalFilter)) newRecords.push(record);
+    });
+    let reNewRecords: Record<string, any>[] = [];
+    tableColumns.map((column: string) => {
+      newRecords.map(record => {
+        if (contains(String(record[column]), String(columnFilter[column]))) reNewRecords.push(record);
+      })
+      console.log('reNewRecords', reNewRecords);
+      newRecords = [...reNewRecords];
+      reNewRecords = [];
+    })
+    console.log('newRecords', newRecords);
+    setDisPlayRecords([...newRecords]);
+  }
+
   const handleDeleteClick = async (ID: number) => {
     if (!selectedTable) return;
 
@@ -171,8 +210,28 @@ export default function DashboardPage() {
     }
   };
 
-  const handleTotalFilter = (e: any) => {
-    setTotalFilter(e.target.value);
+  const contains = (text: string, search: string): boolean => {
+    return text.includes(search);
+  };
+
+  const handleSelect = () => {
+    setIsSelected(!isSelected);
+    setShowNotif(true);
+  }
+
+  const emptyFun = () => {
+
+  }
+
+  const sortJsonByField = (jsonArray: any[], fieldName: string, order: string) => {
+    console.log('order', order);
+    return jsonArray.sort((a, b) => {
+      if (order === 'asc') {
+        return a[fieldName] > b[fieldName] ? 1 : (a[fieldName] < b[fieldName] ? -1 : 0);
+      } else {
+        return a[fieldName] < b[fieldName] ? 1 : (a[fieldName] > b[fieldName] ? -1 : 0);
+      }
+    });
   }
 
   useEffect(() => {
@@ -203,47 +262,20 @@ export default function DashboardPage() {
     fetchTables();
   }, []);
 
-  const contains = (text: string, search: string): boolean => {
-    return text.includes(search);
-  };
-
-  const getDisplayRecords = () => {
-    let newRecords: Record<string, any>[] = [];
-    records.map(record => {
-      let str = '';
-      Object.entries(record).map(([key, value]) => {
-        str += value;
-      });
-      if (contains(str, totalFilter)) newRecords.push(record);
-    })
-    setDisPlayRecords(newRecords);
-  }
-
   useEffect(() => {
     setRowNumber(records.length);
     getDisplayRecords();
-  }, [records, totalFilter])
-
-  const sortJsonByField = (jsonArray: any[], fieldName: string, order: string) => {
-    console.log('order', order);
-    return jsonArray.sort((a, b) => {
-      if (order === 'asc') {
-        return a[fieldName] > b[fieldName] ? 1 : (a[fieldName] < b[fieldName] ? -1 : 0);
-      } else {
-        return a[fieldName] < b[fieldName] ? 1 : (a[fieldName] > b[fieldName] ? -1 : 0);
-      }
-    });
-  }
+  }, [records, totalFilter, columnFilter])
 
   useEffect(() => {
     console.log('sortedColumnState', sortedColumnState);
     console.log('sortedColumnName', sortedColumnName);
-    let sortedArr :any[] = [];
+    let sortedArr: any[] = [];
     if (sortedColumnState == 0) {
       sortedArr = sortJsonByField(disPlayRecords, 'ID', 'asc');
     } else if (sortedColumnState == 1) {
       sortedArr = sortJsonByField(disPlayRecords, sortedColumnName, 'asc');
-    } else {  
+    } else {
       sortedArr = sortJsonByField(disPlayRecords, sortedColumnName, 'desc');
     }
     console.log('sortedArr', sortedArr);
@@ -284,12 +316,13 @@ export default function DashboardPage() {
             {selectedTable ? `テーブル「${selectedTable}」のレコード` : 'レコード表示'}
           </h2>
           <div className='flex items-center'>
+            <SwitchToggle isOn={isOn} toggle={handleToggle} />
             <Input
               id=''
               label=''
               value={totalFilter}
               placeholderValue={`${rowNumber} 行をフィルター`}
-              onChange={(e: any) => handleTotalFilter(e)}
+              onChange={(e: any) => setTotalFilter(e.target.value)}
               className='mt-3 mr-3'
             />
             <Button onClick={() => {
@@ -300,48 +333,67 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Records Table */}
-        {disPlayRecords.length === 0 ? (
-          <p className="text-gray-500">このテーブルにはレコードが存在しません。</p>
-        ) : (
-          <table className="min-w-full table-auto border border-gray-300">
-            <thead>
-              <tr className="bg-gray-100">
-                {Object.keys(disPlayRecords[0]).map((key) => (
-                  <th key={key} className="border border-gray-300 px-4 py-2 max-w-full">
-                    <div className='flex justify-between'>
-                      <div>{key}</div>
-                      <div>
-                        <button onClick={() => {
-                          setSortedColumnName(String(key));
-                          setSortedColumnState((sortedColumnState + 1) % 3);
-                        }}>
-                          {sortedColumnName == key ? sortedColumnState == 1 ? <div className='w-3'>▲</div> : sortedColumnState == 2 ? <div className='w-3'>▼</div> : <div className='w-3'>◼️</div> : <div className='w-3'>◼️</div>}
-                        </button>
-                      </div>
+        <table className="min-w-full table-auto border border-gray-300">
+          <thead>
+            <tr className="bg-gray-100">
+              {tableColumns.map((key) => (
+                <th key={key} className="border border-gray-300 px-4 py-2 max-w-full">
+                  <div className='flex justify-between'>
+                    <div>{key}</div>
+                    <div>
+                      <button onClick={() => {
+                        setSortedColumnName(String(key));
+                        setSortedColumnState((sortedColumnState + 1) % 3);
+                      }}>
+                        {sortedColumnName == key ? sortedColumnState == 1 ? <div className='w-3'>▲</div> : sortedColumnState == 2 ? <div className='w-3'>▼</div> : <div className='w-3'>◼️</div> : <div className='w-3'>◼️</div>}
+                      </button>
                     </div>
-                  </th>
-                ))}
-                <th className="border border-gray-300 px-4 py-2 text-left"></th>
+                  </div>
+                  <div>
+                    <Input
+                      id=''
+                      label=''
+                      value={columnFilter[key]}
+                      placeholderValue='フィルター'
+                      onChange={(e: any) => setColumnFilter({ ...columnFilter, [key]: e.target.value })}
+                      className='mt-3'
+                    />
+                  </div>
+                </th>
+              ))}
+              <th className="border border-gray-300 px-4 py-2 text-left items-center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {disPlayRecords.length === 0 ? (
+              <tr className="hover:bg-gray-50">
+                <td colSpan={tableColumns.length}>
+                  <div className='m-3'>このテーブルにはレコードが存在しません。</div>
+                </td>
+                <td className="border border-gray-300 px-4 py-2 space-x-2">
+                  <Button onClick={() => emptyFun()}>更新</Button>
+                  <Button variant="destructive" onClick={() => emptyFun()}>削除</Button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {disPlayRecords.map((record: RecordType, index) => (
+            ) : (
+              disPlayRecords.map((record: RecordType, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   {Object.values(record).map((value, idx) => (
                     <td key={idx} className="border border-gray-300 px-4 py-2">
                       {String(value)}
                     </td>
                   ))}
-                  <td className="  -pointer border border-gray-300 px-4 py-2 space-x-2">
+                  <td className="border border-gray-300 px-4 py-2 space-x-2">
                     <Button onClick={() => handleEditClick(record)}>更新</Button>
                     <Button variant="destructive" onClick={() => handleDeleteClick(record.ID)}>削除</Button>
+                    {isOn && (
+                      <Button onClick={() => handleSelect()}>{isSelected ? '選択' : '解除'}</Button>
+                    )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              )))}
+          </tbody>
+        </table>
 
         {/* Modal Dialog */}
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -350,7 +402,7 @@ export default function DashboardPage() {
               <DialogTitle>{editMode ? 'レコードを更新' : 'レコードを追加'}</DialogTitle>
             </DialogHeader>
 
-            {tableColumns.map((col) => (
+            {tableColumnsWithoutID.map((col) => (
               <Input
                 key={col}
                 id={col}
@@ -377,6 +429,13 @@ export default function DashboardPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Notification
+          message={isSelected ? "選択されました。" : "解除されました。"}
+          visible={showNotif}
+          onClose={() => setShowNotif(false)}
+        />
+
       </div>
     </main>
   );
