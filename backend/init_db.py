@@ -37,7 +37,7 @@ def init_db():
         ('鈴木花子', 'hanako@example.com', '営業主任'),
         ('田中一郎', 'ichiro@example.com', '営業スタッフ')
     ]
-    cursor.executemany('INSERT INTO 営業マン (名前, メール, 役職) VALUES (?, ?, ?)', 営業マンデータ)
+    cursor.executemany('INSERT INTO 営業マン (名前, メール 役職) VALUES (?, ?, ?)', 営業マンデータ)
 
     # 顧客のサンプルデータを追加（それぞれの営業マンIDに対応）
     顧客データ = [
