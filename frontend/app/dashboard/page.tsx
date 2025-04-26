@@ -530,7 +530,7 @@ export default function DashboardPage() {
             {tableColumnsWithoutID.map((col, id) => (
               listCheck(col) == false ? (
                 <Input
-                  key={id}
+                  key={col}
                   id={col}
                   label={col}
                   value={formData[col] || ''}
@@ -539,11 +539,11 @@ export default function DashboardPage() {
                   placeholderValue=''
                 />
               ) : (
-                <div className={`mb-4`}>
+                <div key={col} className={`mb-4`}>
                   <label className="block text-sm font-medium text-gray-700">
                     {col}
                   </label>
-                  <select key={id} name={col} value={formData[col]} onChange={handleSelectChange} className={`mt-1 p-2 border border-gray-300 rounded-md w-full h-11`}>
+                  <select key={col} name={col} value={formData[col]} onChange={handleSelectChange} className={`mt-1 p-2 border border-gray-300 rounded-md w-full h-11`}>
                     {selectListColumn[col] != undefined && selectListColumn[col].map((cat, idx) => (
                       <option key={idx} value={cat}>
                         {cat}
