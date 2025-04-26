@@ -7,7 +7,7 @@ type Props = {
   message: string;
   visible: boolean;
   onClose: () => void;
-  duration?: number;
+  duration?: number; // in milliseconds
 };
 
 export default function Notification({
@@ -24,8 +24,8 @@ export default function Notification({
 
     if (visible) {
       setShow(true);
-      hideTimeout = setTimeout(() => setShow(false), duration - 300);
-      closeTimeout = setTimeout(() => onClose(), duration);
+      hideTimeout = setTimeout(() => setShow(false), duration - 300); // Start fade out early
+      closeTimeout = setTimeout(() => onClose(), duration); // Remove completely
     }
 
     return () => {
@@ -39,12 +39,12 @@ export default function Notification({
   return (
     <div
       className={`
-        fixed top-6 right-6 z-50
-        px-6 py-3 rounded-lg shadow-lg flex items-center gap-3
-        bg-green-500 text-white
-        transform transition-all duration-300 ease-in-out
-        ${show ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'}
-      `}
+    fixed top-6 right-6 z-50
+    px-6 py-3 rounded-lg shadow-lg flex items-center gap-3
+    bg-green-600 text-white
+    transform transition-all duration-300 ease-in-out
+    ${show ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'}
+  `}
     >
       <svg
         className="w-5 h-5 text-white"

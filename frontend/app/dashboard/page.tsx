@@ -5,15 +5,14 @@ import { Button } from '../componenets/ui/Button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../componenets/ui/Dialog'
 import { Input } from '../componenets/ui/Input';
 import { LOGIN_SERVER_URL, SERVER_URL } from '../config';
-import Toggle from '../componenets/ui/SwitchToggle';
 import SwitchToggle from '../componenets/ui/SwitchToggle';
 import Notification from '../componenets/Notification';
 
-type RecordType = { [key: string]: any; id: number };
+type RecordType = { [key: string]: any; ID: number };
 
 export default function DashboardPage() {
   const [tables, setTables] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [selectedTableName, setSelectedTableName] = useState<string>('');
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,14 +28,19 @@ export default function DashboardPage() {
   const [sortedColumnState, setSortedColumnState] = useState(0);
   const [tableColumnsWithoutID, setTableColumnsWithoutID] = useState<string[]>([]);
   const [isOn, setIsOn] = useState(false);
-  const [isSelected, setIsSelected] = useState(false);
+  const [isSelectedState, setIsSelectedState] = useState(false);
+  const [selectedId, setSelectedId] = useState<number>(-1);
+  const [parentTableName, setParentTableName] = useState<string>('');
   const [showNotif, setShowNotif] = useState(false);
+  const [child, setChild] = useState<{ [key: string]: any }>({});
+  const [listColumn, setListColumn] = useState<{ [key: string]: any }>({});
+  const [options, setOptions] = useState<string[]>([]);
+  const [selectListColumn, setSelectListColumn] = useState<{ [key: string]: any[] }>({});
 
   const handleToggle = () => {
     setIsOn(prev => !prev);
+    setIsSelectedState(false);
   }
-
-  const triggerNotification = () => setShowNotif(true);
 
   const fetchTables = async () => {
     try {
@@ -45,7 +49,7 @@ export default function DashboardPage() {
       const tableList = data.tables;
       setTables(tableList.filter((t: string) => t !== 'sqlite_sequence'));
       if (tableList.length > 0) {
-        setSelectedTable(tableList[0]);
+        setSelectedTableName(tableList[0]);
         fetchRecords(tableList[0]);
         fetchTableColumns(tableList[0]);
       }
@@ -56,6 +60,28 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchChild = async () => {
+    try {
+      const res = await fetch(`${SERVER_URL}child/`);
+      const data = await res.json();
+      setChild(data.child);
+    } catch (err) {
+      console.error('テーブル取得エラー:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchListColumn = async () => {
+    try {
+      const res = await fetch(`${SERVER_URL}list_column/`);
+      const data = await res.json();
+      setListColumn(data.list_column);
+    } catch (err) {
+      console.error('テーブル取得エラー:', err);
+    }
+  }
+
   const fetchTableColumns = async (tableName: string) => {
     try {
       const res = await fetch(`${SERVER_URL}columns/${tableName}`);
@@ -63,12 +89,12 @@ export default function DashboardPage() {
       setTableColumns(data.columns || []);
       const newCol = data.columns.filter((ele: string) => ele != 'ID');
       setTableColumnsWithoutID([...newCol]);
-
       // Initialize formData with empty strings
       const initialForm: { [key: string]: any } = {};
       data.columns.forEach((col: string) => initialForm[col] = '');
       setFormData(initialForm);
       setColumnFilter(initialForm);
+      fetchOptions()
     } catch (err) {
       console.error('Failed to fetch columns:', err);
     }
@@ -84,14 +110,41 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchOptions = () => {
+    let containTable: Boolean = false;
+    Object.keys(listColumn).some(key => {
+      if (key == selectedTableName) containTable = true;
+    }
+    )
+    if (containTable) {
+      const arr = listColumn[selectedTableName];
+      console.log('curTableListcolumn', arr);
+      let newArr: { [key: string]: any } = {};
+      console.log('tableColumns', tableColumns);
+      for (let i = 0; i < tableColumns.length; i++) {
+        const columnName = tableColumns[i];
+        console.log('curColumnName', columnName);
+        for (let j = 0; j < arr.length; j++) {
+          const ele = arr[j];
+          if (ele['column'] != columnName) continue;
+          newArr = { ...newArr, [columnName]: ele['values'] };
+          break;
+        }
+      }
+      console.log('newArr', newArr);
+      setSelectListColumn({ ...newArr });
+    }
+    return;
+  }
+
   const handleTableClick = (tableName: string) => {
-    setSelectedTable(tableName);
+    setSelectedTableName(tableName);
     fetchRecords(tableName);
     fetchTableColumns(tableName); // Get column names
+    fetchOptions();
   };
 
   const handleFormSubmit = async () => {
-    console.log('formdata', formData);
     let flag: Boolean = false;
     Object.entries(formData).forEach(([key, value]) => {
       if (value === '') flag = true;
@@ -101,10 +154,10 @@ export default function DashboardPage() {
       alert('正確に入力してください。');
       return;
     }
-    if (!selectedTable) return;
+    if (!selectedTableName) return;
 
     try {
-      const res = await fetch(`${SERVER_URL}items/${selectedTable}`, {
+      const res = await fetch(`${SERVER_URL}items/${selectedTableName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -114,15 +167,15 @@ export default function DashboardPage() {
 
       setIsModalOpen(false);
       setFormData({});
-      fetchRecords(selectedTable); // Reload data
+      fetchRecords(selectedTableName); // Reload data
     } catch (err) {
       console.error('Items error:', err);
     }
   };
 
   const handleEditClick = async (record: any) => {
-    if (!selectedTable) return;
-    await fetchTableColumns(selectedTable);
+    if (!selectedTableName) return;
+    await fetchTableColumns(selectedTableName);
     setEditMode(true);
     setEditId(record.ID);
     const { ID, ...editableData } = record;
@@ -132,7 +185,6 @@ export default function DashboardPage() {
       acc[col] = editableData[col] || ''; // if undefined, set to empty string
       return acc;
     }, {} as any);
-    console.log('completeData', completeData);
     setFormData(completeData);
     setIsModalOpen(true);
   };
@@ -148,10 +200,10 @@ export default function DashboardPage() {
       return;
     }
 
-    if (!selectedTable || editId === null) return;
+    if (!selectedTableName || editId === null) return;
 
     try {
-      const res = await fetch(`${SERVER_URL}items/${selectedTable}/${editId}`, {
+      const res = await fetch(`${SERVER_URL}items/${selectedTableName}/${editId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -163,7 +215,7 @@ export default function DashboardPage() {
       setEditMode(false);
       setEditId(null);
       setFormData({});
-      fetchRecords(selectedTable);
+      fetchRecords(selectedTableName);
     } catch (err) {
       console.error('更新エラー:', err);
     }
@@ -183,28 +235,46 @@ export default function DashboardPage() {
       newRecords.map(record => {
         if (contains(String(record[column]), String(columnFilter[column]))) reNewRecords.push(record);
       })
-      console.log('reNewRecords', reNewRecords);
       newRecords = [...reNewRecords];
       reNewRecords = [];
     })
-    console.log('newRecords', newRecords);
+    if (isOn && isSelectedState) {
+      let fkcolumnName = `${parentTableName}ID`;
+      let check: Boolean = false;
+      Object.entries(columnFilter).forEach(([key, value]) => {
+        if (key == fkcolumnName) check = true;
+      });
+      if (check == true) {
+        const childArr = child[parentTableName];
+        let flag: Boolean = false;
+        for (let i = 0; i < childArr.length; i++) {
+          if (childArr[i] != selectedTableName) continue;
+          flag = true; break;
+        }
+        if (flag) {
+          newRecords = newRecords.filter(record => {
+            return record[fkcolumnName] == selectedId;
+          });
+        }
+      }
+    }
     setDisPlayRecords([...newRecords]);
   }
 
   const handleDeleteClick = async (ID: number) => {
-    if (!selectedTable) return;
+    if (!selectedTableName) return;
 
     const confirmDelete = window.confirm('本当にこのレコードを削除しますか？');
     if (!confirmDelete) return;
 
     try {
-      const res = await fetch(`${SERVER_URL}items/${selectedTable}/${ID}`, {
+      const res = await fetch(`${SERVER_URL}items/${selectedTableName}/${ID}`, {
         method: 'DELETE',
       });
 
       if (!res.ok) throw new Error('Delete failed');
 
-      fetchRecords(selectedTable);
+      fetchRecords(selectedTableName);
     } catch (err) {
       console.error('削除エラー:', err);
     }
@@ -214,9 +284,11 @@ export default function DashboardPage() {
     return text.includes(search);
   };
 
-  const handleSelect = () => {
-    setIsSelected(!isSelected);
+  const handleSelect = (record: RecordType) => {
+    setIsSelectedState(!isSelectedState);
     setShowNotif(true);
+    setSelectedId(record.ID);
+    setParentTableName(selectedTableName);
   }
 
   const emptyFun = () => {
@@ -224,7 +296,6 @@ export default function DashboardPage() {
   }
 
   const sortJsonByField = (jsonArray: any[], fieldName: string, order: string) => {
-    console.log('order', order);
     return jsonArray.sort((a, b) => {
       if (order === 'asc') {
         return a[fieldName] > b[fieldName] ? 1 : (a[fieldName] < b[fieldName] ? -1 : 0);
@@ -234,42 +305,70 @@ export default function DashboardPage() {
     });
   }
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const res = await fetch(`${LOGIN_SERVER_URL}check-session`, {
-          method: 'GET',
-          credentials: 'include'
-        });
-        if (!res.ok) {
-          // Session expired
-          window.location.href = '/'; // Redirect to login page
-        }
-      } catch (err) {
-        console.error('Session check failed:', err);
-        window.location.href = '/';
+  const checkSession = async () => {
+    try {
+      const res = await fetch(`${LOGIN_SERVER_URL}check-session`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        // Session expired
+        window.location.href = '/'; // Redirect to login page
       }
-    };
+    } catch (err) {
+      console.error('Session check failed:', err);
+      window.location.href = '/';
+    }
+  };
 
+  const listCheck = (columnName: string) => {
+
+    let containTable: Boolean = false;
+    Object.keys(listColumn).some(key => {
+      if (key == selectedTableName) containTable = true;
+    }
+    )
+    if (containTable) {
+      const arr = listColumn[selectedTableName];
+      let columnCheck = false;
+      for (let i = 0; i < arr.length; i++) {
+        const ele = arr[i];
+        if (ele['column'] != columnName) continue;
+        columnCheck = true; break;
+      }
+      return columnCheck;
+    }
+    return containTable;
+  }
+
+  const handleSelectChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  useEffect(() => {
+    fetchOptions();
+  }, [listColumn, selectedTableName, tableColumns]);
+
+  useEffect(() => {
     // Check every 30 seconds
     const interval = setInterval(checkSession, 30000);
     checkSession(); // Also run once right away
-
     return () => clearInterval(interval); // Cleanup on unmount
   }, []);
 
   useEffect(() => {
     fetchTables();
+    fetchChild();
+    fetchListColumn();
   }, []);
 
   useEffect(() => {
     setRowNumber(records.length);
     getDisplayRecords();
-  }, [records, totalFilter, columnFilter])
+  }, [records, totalFilter, columnFilter, isOn]);
 
   useEffect(() => {
-    console.log('sortedColumnState', sortedColumnState);
-    console.log('sortedColumnName', sortedColumnName);
     let sortedArr: any[] = [];
     if (sortedColumnState == 0) {
       sortedArr = sortJsonByField(disPlayRecords, 'ID', 'asc');
@@ -278,9 +377,8 @@ export default function DashboardPage() {
     } else {
       sortedArr = sortJsonByField(disPlayRecords, sortedColumnName, 'desc');
     }
-    console.log('sortedArr', sortedArr);
     setDisPlayRecords([...sortedArr]);
-  }, [sortedColumnState])
+  }, [sortedColumnState]);
 
   return (
     <main className="flex h-screen">
@@ -297,7 +395,7 @@ export default function DashboardPage() {
               <li
                 key={table}
                 onClick={() => handleTableClick(table)}
-                className={`cursor-pointer px-3 py-2 rounded-md transition-all ${table === selectedTable
+                className={`cursor-pointer px-3 py-2 rounded-md transition-all ${table === selectedTableName
                   ? 'bg-blue-500 text-white font-bold'
                   : 'hover:bg-blue-100 text-gray-800'
                   }`}
@@ -309,11 +407,12 @@ export default function DashboardPage() {
         )}
       </div>
 
+
       {/* Main Area */}
       <div className="w-3/4 p-6 overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">
-            {selectedTable ? `テーブル「${selectedTable}」のレコード` : 'レコード表示'}
+            {selectedTableName ? `テーブル「${selectedTableName}」のレコード` : 'レコード表示'}
           </h2>
           <div className='flex items-center'>
             <SwitchToggle isOn={isOn} toggle={handleToggle} />
@@ -327,7 +426,16 @@ export default function DashboardPage() {
             />
             <Button onClick={() => {
               setIsModalOpen(true);
-              setFormData({});
+              if (isOn && isSelectedState) {
+                let fkcolumnName = `${parentTableName}ID`;
+                let check: Boolean = false;
+                Object.entries(columnFilter).forEach(([key, value]) => {
+                  if (key == fkcolumnName) check = true;
+                });
+                if (check) setFormData({ [fkcolumnName]: selectedId });
+              } else {
+                setFormData({});
+              }
             }}
             >追加</Button>
           </div>
@@ -384,10 +492,27 @@ export default function DashboardPage() {
                     </td>
                   ))}
                   <td className="border border-gray-300 px-4 py-2 space-x-2">
-                    <Button onClick={() => handleEditClick(record)}>更新</Button>
+                    <Button
+                      onClick={() => handleEditClick(record)}
+                      variant='edit'
+                    >
+                      更新
+                    </Button>
                     <Button variant="destructive" onClick={() => handleDeleteClick(record.ID)}>削除</Button>
                     {isOn && (
-                      <Button onClick={() => handleSelect()}>{isSelected ? '選択' : '解除'}</Button>
+                      <Button
+                        onClick={() => handleSelect(record)}
+                        isSelectedState={isSelectedState}
+                        parentTableName={parentTableName}
+                        selectedTableName={selectedTableName}
+                        selectedID={selectedId}
+                        curID={record.ID}
+                        variant= {isSelectedState == true && parentTableName == selectedTableName && record.ID == selectedId ? 'deselect': 'select'}
+                      >
+                        {
+                          isSelectedState == true && parentTableName == selectedTableName && record.ID == selectedId ? '解除' : '選択'
+                        }
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -402,17 +527,31 @@ export default function DashboardPage() {
               <DialogTitle>{editMode ? 'レコードを更新' : 'レコードを追加'}</DialogTitle>
             </DialogHeader>
 
-            {tableColumnsWithoutID.map((col) => (
-              <Input
-                key={col}
-                id={col}
-                label={col}
-                value={formData[col] || ''}
-                onChange={(e: any) => setFormData({ ...formData, [col]: e.target.value })}
-                className=''
-                placeholderValue=''
-              />
-            ))}
+            {tableColumnsWithoutID.map((col, id) => (
+              listCheck(col) == false ? (
+                <Input
+                  key={id}
+                  id={col}
+                  label={col}
+                  value={formData[col] || ''}
+                  onChange={(e: any) => setFormData({ ...formData, [col]: e.target.value })}
+                  className=''
+                  placeholderValue=''
+                />
+              ) : (
+                <div className={`mb-4`}>
+                  <label className="block text-sm font-medium text-gray-700">
+                    {col}
+                  </label>
+                  <select key={id} name={col} value={formData[col]} onChange={handleSelectChange} className={`mt-1 p-2 border border-gray-300 rounded-md w-full h-11`}>
+                    {selectListColumn[col] != undefined && selectListColumn[col].map((cat, idx) => (
+                      <option key={idx} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )))}
 
             <div className="mt-4 flex justify-end space-x-2">
               <Button onClick={() => {
@@ -431,12 +570,13 @@ export default function DashboardPage() {
         </Dialog>
 
         <Notification
-          message={isSelected ? "選択されました。" : "解除されました。"}
+          message={isSelectedState ? `${selectedTableName}テーブルのID=${selectedId}が親として選択されました。`: "解除されました。"}
           visible={showNotif}
           onClose={() => setShowNotif(false)}
         />
 
       </div>
+
     </main>
   );
 }

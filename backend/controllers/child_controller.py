@@ -1,7 +1,8 @@
 from fastapi import Request
 from database import get_db_connection
-from child import child
+from initial_setting import child
 
 def read_child():
     arr = child()
-    return {child: arr}
+    print(arr)
+    return {"child": arr}

@@ -25,3 +25,4 @@ export default function SwitchToggle({ isOn, toggle }: SwitchToggleProps) {
     </div>
   );
 }
+
