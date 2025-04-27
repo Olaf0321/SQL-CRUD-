@@ -118,12 +118,9 @@ export default function DashboardPage() {
     )
     if (containTable) {
       const arr = listColumn[selectedTableName];
-      console.log('curTableListcolumn', arr);
       let newArr: { [key: string]: any } = {};
-      console.log('tableColumns', tableColumns);
       for (let i = 0; i < tableColumns.length; i++) {
         const columnName = tableColumns[i];
-        console.log('curColumnName', columnName);
         for (let j = 0; j < arr.length; j++) {
           const ele = arr[j];
           if (ele['column'] != columnName) continue;
@@ -131,7 +128,6 @@ export default function DashboardPage() {
           break;
         }
       }
-      console.log('newArr', newArr);
       setSelectListColumn({ ...newArr });
     }
     return;
