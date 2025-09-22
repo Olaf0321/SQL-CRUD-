@@ -13,6 +13,8 @@ type RecordType = { [key: string]: any; ID: number };
 export default function DashboardPage() {
   const [tables, setTables] = useState<string[]>([]);
   const [selectedTableName, setSelectedTableName] = useState<string>('');
+  const [databases, setDatabases] = useState<any[]>([]);
+  const [selectedDatabase, setSelectedDatabase] = useState<any | null>(null);
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,17 +44,46 @@ export default function DashboardPage() {
     setIsSelectedState(false);
   }
 
+  const DB_LIST_URL = 'http://localhost:8080/database/';
+
+  const buildDbHeaders = () => {
+    if (!selectedDatabase) return {} as any;
+    return {
+      'X-DB-Type': 'mysql',
+      'X-DB-Host': selectedDatabase['ホスト'] || 'localhost',
+      'X-DB-Port': String(selectedDatabase['ポート'] ?? '3306'),
+      'X-DB-User': selectedDatabase['接続ID'] || '',
+      'X-DB-Password': selectedDatabase['パスワード'] || '',
+      'X-DB-Name': selectedDatabase['データベース名'] || ''
+    } as any;
+  }
+
+  const fetchDatabases = async () => {
+    try {
+      const res = await fetch(DB_LIST_URL);
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.databases) ? data.databases : [data]);
+      setDatabases(list.filter(Boolean));
+    } catch (err) {
+      console.error('データベース一覧取得エラー:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const fetchTables = async () => {
     try {
-      const res = await fetch(`${SERVER_URL}tables/`);
+      if (!selectedDatabase) return;
+      const dbName = selectedDatabase['データベース名'];
+      const res = await fetch(`${SERVER_URL}tables/${encodeURIComponent(dbName)}` , {
+        headers: {
+          ...buildDbHeaders()
+        }
+      });
       const data = await res.json();
       const tableList = data.tables;
       setTables(tableList.filter((t: string) => t !== 'sqlite_sequence'));
-      if (tableList.length > 0) {
-        setSelectedTableName(tableList[0]);
-        fetchRecords(tableList[0]);
-        fetchTableColumns(tableList[0]);
-      }
+      // do not auto-select a table; wait for user selection
     } catch (err) {
       console.error('テーブル取得エラー:', err);
     } finally {
@@ -62,7 +93,11 @@ export default function DashboardPage() {
 
   const fetchChild = async () => {
     try {
-      const res = await fetch(`${SERVER_URL}child/`);
+      if (!selectedDatabase) return;
+      const dbName = selectedDatabase['データベース名'];
+      const res = await fetch(`${SERVER_URL}child/${encodeURIComponent(dbName)}`, {
+        headers: { ...buildDbHeaders() }
+      });
       const data = await res.json();
       setChild(data.child);
     } catch (err) {
@@ -74,7 +109,11 @@ export default function DashboardPage() {
 
   const fetchListColumn = async () => {
     try {
-      const res = await fetch(`${SERVER_URL}list_column/`);
+      if (!selectedDatabase) return;
+      const dbName = selectedDatabase['データベース名'];
+      const res = await fetch(`${SERVER_URL}list_column/${encodeURIComponent(dbName)}`, {
+        headers: { ...buildDbHeaders() }
+      });
       const data = await res.json();
       setListColumn(data.list_column);
     } catch (err) {
@@ -84,14 +123,20 @@ export default function DashboardPage() {
 
   const fetchTableColumns = async (tableName: string) => {
     try {
-      const res = await fetch(`${SERVER_URL}columns/${tableName}`);
+      if (!selectedDatabase) return;
+      const dbName = selectedDatabase['データベース名'];
+      const res = await fetch(`${SERVER_URL}columns/${encodeURIComponent(dbName)}/${encodeURIComponent(tableName)}`, {
+        headers: {
+          ...buildDbHeaders()
+        }
+      });
       const data = await res.json();
       setTableColumns(data.columns || []);
-      const newCol = data.columns.filter((ele: string) => ele != 'ID');
+      const newCol = data.columns.filter((ele: string) => ele !== 'ID' && ele !== 'id');
       setTableColumnsWithoutID([...newCol]);
       // Initialize formData with empty strings
       const initialForm: { [key: string]: any } = {};
-      data.columns.forEach((col: string) => initialForm[col] = '');
+      newCol.forEach((col: string) => initialForm[col] = '');
       setFormData(initialForm);
       setColumnFilter(initialForm);
       fetchOptions()
@@ -102,7 +147,13 @@ export default function DashboardPage() {
 
   const fetchRecords = async (tableName: string) => {
     try {
-      const res = await fetch(`${SERVER_URL}items/${tableName}`);
+      if (!selectedDatabase) return;
+      const dbName = selectedDatabase['データベース名'];
+      const res = await fetch(`${SERVER_URL}items/${encodeURIComponent(dbName)}/${encodeURIComponent(tableName)}`, {
+        headers: {
+          ...buildDbHeaders()
+        }
+      });
       const data = await res.json();
       setRecords(data.records || []);
     } catch (err) {
@@ -153,9 +204,11 @@ export default function DashboardPage() {
     if (!selectedTableName) return;
 
     try {
-      const res = await fetch(`${SERVER_URL}items/${selectedTableName}`, {
+      if (!selectedDatabase) return;
+      const dbName = selectedDatabase['データベース名'];
+      const res = await fetch(`${SERVER_URL}items/${encodeURIComponent(dbName)}/${encodeURIComponent(selectedTableName)}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...buildDbHeaders() },
         body: JSON.stringify(formData),
       });
 
@@ -174,7 +227,8 @@ export default function DashboardPage() {
     await fetchTableColumns(selectedTableName);
     setEditMode(true);
     setEditId(record.ID);
-    const { ID, ...editableData } = record;
+    const { ID, id, ...rest } = record as any;
+    const editableData = { ...rest };
 
     // Fill missing keys with empty string
     const completeData = tableColumnsWithoutID.reduce((acc, col) => {
@@ -199,9 +253,11 @@ export default function DashboardPage() {
     if (!selectedTableName || editId === null) return;
 
     try {
-      const res = await fetch(`${SERVER_URL}items/${selectedTableName}/${editId}`, {
+      if (!selectedDatabase) return;
+      const dbName = selectedDatabase['データベース名'];
+      const res = await fetch(`${SERVER_URL}items/${encodeURIComponent(dbName)}/${encodeURIComponent(selectedTableName)}/${encodeURIComponent(String(editId))}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...buildDbHeaders() },
         body: JSON.stringify(formData),
       });
 
@@ -228,8 +284,10 @@ export default function DashboardPage() {
     });
     let reNewRecords: Record<string, any>[] = [];
     tableColumns.map((column: string) => {
+      const filterValue = String(columnFilter[column] ?? '');
+      if (filterValue === '') return; // no filter for this column
       newRecords.map(record => {
-        if (contains(String(record[column]), String(columnFilter[column]))) reNewRecords.push(record);
+        if (contains(String(record[column] ?? ''), filterValue)) reNewRecords.push(record);
       })
       newRecords = [...reNewRecords];
       reNewRecords = [];
@@ -264,8 +322,13 @@ export default function DashboardPage() {
     if (!confirmDelete) return;
 
     try {
-      const res = await fetch(`${SERVER_URL}items/${selectedTableName}/${ID}`, {
+      if (!selectedDatabase) return;
+      const dbName = selectedDatabase['データベース名'];
+      const res = await fetch(`${SERVER_URL}items/${encodeURIComponent(dbName)}/${encodeURIComponent(selectedTableName)}/${encodeURIComponent(String(ID))}`, {
         method: 'DELETE',
+        headers: {
+          ...buildDbHeaders()
+        }
       });
 
       if (!res.ok) throw new Error('Delete failed');
@@ -354,10 +417,24 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    fetchTables();
+    fetchDatabases();
     fetchChild();
     fetchListColumn();
   }, []);
+
+  useEffect(() => {
+    // when database selection changes, reset and load tables
+    setTables([]);
+    setSelectedTableName('');
+    setRecords([]);
+    if (selectedDatabase) {
+      setLoading(true);
+      fetchTables();
+      // Load relationship and list metadata for filtering and select lists
+      fetchChild();
+      fetchListColumn();
+    }
+  }, [selectedDatabase]);
 
   useEffect(() => {
     setRowNumber(records.length);
@@ -406,6 +483,26 @@ export default function DashboardPage() {
 
       {/* Main Area */}
       <div className="w-3/4 p-6 overflow-y-auto">
+        {/* Database Selector */}
+        <div className="mb-4 flex items-center gap-3">
+          <label className="text-sm text-gray-700">データベース</label>
+          <select
+            className="border border-gray-300 rounded-md p-2"
+            value={selectedDatabase ? selectedDatabase['id'] ?? '' : ''}
+            onChange={(e) => {
+              const id = e.target.value;
+              const db = databases.find(d => String(d.id ?? d['id']) === id);
+              setSelectedDatabase(db ?? null);
+            }}
+          >
+            <option value="">未選択</option>
+            {databases.map((db, idx) => (
+              <option key={db.id ?? idx} value={String(db.id ?? idx)}>
+                {db['データベース名']}@{db['ホスト']}:{db['ポート']}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">
             {selectedTableName ? `テーブル「${selectedTableName}」のレコード` : 'レコード表示'}
@@ -424,11 +521,8 @@ export default function DashboardPage() {
               setIsModalOpen(true);
               if (isOn && isSelectedState) {
                 let fkcolumnName = `${parentTableName}ID`;
-                let check: Boolean = false;
-                Object.entries(columnFilter).forEach(([key, value]) => {
-                  if (key == fkcolumnName) check = true;
-                });
-                if (check) setFormData({ [fkcolumnName]: selectedId });
+                const hasFk = tableColumns.includes(fkcolumnName);
+                if (hasFk) setFormData({ [fkcolumnName]: selectedId });
               } else {
                 setFormData({});
               }
@@ -457,7 +551,7 @@ export default function DashboardPage() {
                     <Input
                       id=''
                       label=''
-                      value={columnFilter[key]}
+                      value={columnFilter[key] ?? ''}
                       placeholderValue='フィルター'
                       onChange={(e: any) => setColumnFilter({ ...columnFilter, [key]: e.target.value })}
                       className='mt-3'
@@ -482,9 +576,9 @@ export default function DashboardPage() {
             ) : (
               disPlayRecords.map((record: RecordType, index) => (
                 <tr key={index} className="hover:bg-gray-50">
-                  {Object.values(record).map((value, idx) => (
-                    <td key={idx} className="border border-gray-300 px-4 py-2">
-                      {String(value)}
+                  {tableColumns.map((key) => (
+                    <td key={`${index}-${key}`} className="border border-gray-300 px-4 py-2">
+                      {String(record[key] ?? '')}
                     </td>
                   ))}
                   <td className="border border-gray-300 px-4 py-2 space-x-2">

@@ -3,6 +3,6 @@ from controllers import tables_controller
 
 router = APIRouter()
 
-@router.get("/")
-def get_tables():
-    return tables_controller.read_tables()
+@router.get("/{db_name}")
+def get_tables(db_name: str, request: Request):
+    return tables_controller.read_tables(request, db_name)
