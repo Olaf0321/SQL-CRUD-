@@ -1,0 +1,6 @@
+node_modules
+dist
+.next
+venv
+__pycache__
+venv

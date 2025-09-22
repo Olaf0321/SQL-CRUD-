@@ -18,7 +18,7 @@ app.use(session({
     secret: 'your-secret-key', // Change this to a random secret
     resave: false,
     saveUninitialized: true,
-    cookie: { maxAge: 60000 } // Session expires in 60 seconds (1 minute)
+    cookie: { maxAge: 6000000 } // Session expires in 60 seconds (1 minute)
 }));
 
 // Dummy user credentials (replace with actual secure storage later)
