@@ -422,12 +422,12 @@ export default function DashboardPage() {
     fetchOptions();
   }, [listColumn, selectedTableName, tableColumns]);
 
-  useEffect(() => {
-    // Check every 30 seconds
-    const interval = setInterval(checkSession, 30000);
-    checkSession(); // Also run once right away
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, []);
+  // useEffect(() => {
+  //   // Check every 30 seconds
+  //   const interval = setInterval(checkSession, 30000);
+  //   checkSession(); // Also run once right away
+  //   return () => clearInterval(interval); // Cleanup on unmount
+  // }, []);
 
   useEffect(() => {
     fetchDatabases();
