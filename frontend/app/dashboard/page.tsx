@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../componenets/ui/Button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../componenets/ui/Dialog'
 import { Input } from '../componenets/ui/Input';
-import { LOGIN_SERVER_URL, SERVER_URL } from '../config';
+import { LOGIN_SERVER_URL, SERVER_URL, DB_LIST_URL } from '../config';
 import SwitchToggle from '../componenets/ui/SwitchToggle';
 import Notification from '../componenets/Notification';
 
@@ -38,13 +38,12 @@ export default function DashboardPage() {
   const [listColumn, setListColumn] = useState<{ [key: string]: any }>({});
   const [options, setOptions] = useState<string[]>([]);
   const [selectListColumn, setSelectListColumn] = useState<{ [key: string]: any[] }>({});
+  const [fkcolumnName, setFkColumnName] = useState<string>("");
 
   const handleToggle = () => {
     setIsOn(prev => !prev);
     setIsSelectedState(false);
   }
-
-  const DB_LIST_URL = 'http://localhost:8080/database/';
 
   const buildDbHeaders = () => {
     if (!selectedDatabase) return {} as any;
@@ -75,7 +74,7 @@ export default function DashboardPage() {
     try {
       if (!selectedDatabase) return;
       const dbName = selectedDatabase['データベース名'];
-      const res = await fetch(`${SERVER_URL}tables/${encodeURIComponent(dbName)}` , {
+      const res = await fetch(`${SERVER_URL}tables/${encodeURIComponent(dbName)}`, {
         headers: {
           ...buildDbHeaders()
         }
@@ -273,7 +272,7 @@ export default function DashboardPage() {
     }
   };
 
-  const getDisplayRecords = () => {
+  const getDisplayRecords = async () => {
     let newRecords: Record<string, any>[] = [];
     records.map(record => {
       let str = '';
@@ -293,23 +292,37 @@ export default function DashboardPage() {
       reNewRecords = [];
     })
     if (isOn && isSelectedState) {
-      let fkcolumnName = `${parentTableName}ID`;
-      let check: Boolean = false;
-      Object.entries(columnFilter).forEach(([key, value]) => {
-        if (key == fkcolumnName) check = true;
+      // TODO: Implement this
+      // This is a placeholder for the actual implementation
+      // Currently, in this code, the fkcolumnName is made from parentTableName + ID
+      // So, if actual column name is different from parentTableName + ID, this will not work
+      // So, i gonna get fkcolumnName using request to the server
+      // The configuration of requst is like following:
+      // purpos: check if the selectedTable is a child of parentTableName
+      // how to do:
+      // Send parentTableName and selectedTableName to the backend.
+      // Information about selectedDatabase is also sent.
+      // The backend connects to MySQL based on the information in selectedDatabase.
+      // Get column information about parentTableName and selectedTableName.
+      // If the column name is found, return the column name.
+      // If not, return "".
+      // The request is sent to the backend using fetch.
+      // The response is received and the fkcolumnName is set.
+      // If the fkcolumnName is not "", the fkcolumnName is used to filter the records.
+      // If the fkcolumnName is "", the records are not filtered.
+      // The filtered records are displayed.
+      console.log("parentTableName: ", parentTableName);
+      console.log("selectedTableName: ", selectedTableName);
+      const res = await fetch(`${SERVER_URL}fkcolumnName/${encodeURIComponent(parentTableName)}/${encodeURIComponent(selectedTableName)}`, {
+        headers: { ...buildDbHeaders() }
       });
-      if (check == true) {
-        const childArr = child[parentTableName];
-        let flag: Boolean = false;
-        for (let i = 0; i < childArr.length; i++) {
-          if (childArr[i] != selectedTableName) continue;
-          flag = true; break;
-        }
-        if (flag) {
-          newRecords = newRecords.filter(record => {
-            return record[fkcolumnName] == selectedId;
-          });
-        }
+      const data = await res.json();
+      const fkcolumnName = data;
+      setFkColumnName(fkcolumnName);
+      if (fkcolumnName != "") {
+        newRecords = newRecords.filter(record => {
+          return record[fkcolumnName] == selectedId;
+        });
       }
     }
     setDisPlayRecords([...newRecords]);
@@ -520,7 +533,6 @@ export default function DashboardPage() {
             <Button onClick={() => {
               setIsModalOpen(true);
               if (isOn && isSelectedState) {
-                let fkcolumnName = `${parentTableName}ID`;
                 const hasFk = tableColumns.includes(fkcolumnName);
                 if (hasFk) setFormData({ [fkcolumnName]: selectedId });
               } else {
@@ -597,7 +609,7 @@ export default function DashboardPage() {
                         selectedTableName={selectedTableName}
                         selectedID={selectedId}
                         curID={record.ID}
-                        variant= {isSelectedState == true && parentTableName == selectedTableName && record.ID == selectedId ? 'deselect': 'select'}
+                        variant={isSelectedState == true && parentTableName == selectedTableName && record.ID == selectedId ? 'deselect' : 'select'}
                       >
                         {
                           isSelectedState == true && parentTableName == selectedTableName && record.ID == selectedId ? '解除' : '選択'
@@ -660,7 +672,7 @@ export default function DashboardPage() {
         </Dialog>
 
         <Notification
-          message={isSelectedState ? `${selectedTableName}テーブルのID=${selectedId}が親として選択されました。`: "解除されました。"}
+          message={isSelectedState ? `${selectedTableName}テーブルのID=${selectedId}が親として選択されました。` : "解除されました。"}
           visible={showNotif}
           onClose={() => setShowNotif(false)}
         />
